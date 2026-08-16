@@ -2,44 +2,67 @@
   <img src="assets/mascot/pip_flight_loop.gif" alt="Pip, the courier bird" width="200">
 </p>
 
-# AI Job Search
+# AI Job Search China
 
-*The job search that runs on your machine.*
+*面向中国大陆求职市场的 Codex 兼容 AI 求职工作流。*
 
-<p align="center">
-  <a href="https://trendshift.io/repositories/43622?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-43622" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/43622/daily" alt="MadsLorentzen%2Fai-job-search | Trendshift" width="250" height="55"/></a>
-</p>
+[![CI](https://github.com/limuchuan0619/ai-job-search-china/actions/workflows/ci.yml/badge.svg)](https://github.com/limuchuan0619/ai-job-search-china/actions/workflows/ci.yml)
 
-[![CI](https://github.com/MadsLorentzen/ai-job-search/actions/workflows/ci.yml/badge.svg)](https://github.com/MadsLorentzen/ai-job-search/actions/workflows/ci.yml)
+`ai-job-search-china` is an independent mainland-China adaptation of
+[MadsLorentzen/ai-job-search](https://github.com/MadsLorentzen/ai-job-search).
+It extends the upstream country-agnostic framework with China-market search,
+internship and campus-recruitment fields, source-confidence controls, and
+portable Codex workflow entry points. It is not the upstream project's official
+China distribution.
 
-An AI-powered job application framework built on [Claude Code](https://claude.com/claude-code). Fork it, fill in your profile, and let Claude evaluate job postings, tailor your CV, write cover letters, and prepare you for interviews.
+> **定位说明：** 这是“中国大陆市场适配版”，不是只能搜索中国岗位的封闭分支。
+> 原项目的通用申请、简历、求职信、排名、面试与能力提升能力继续保留；中国搜索
+> 是默认启用的市场适配层，其他国家和行业仍可通过来源 Skill 与搜索预设扩展。
 
-> Note: This is an independent open-source project and is not affiliated with, endorsed by, sponsored by, or maintained by Anthropic. Anthropic and Claude Code are referenced only to describe the toolchain this workflow uses.
->
-> This project has **no affiliated cryptocurrency, token, or paid sponsorship program**. Anything claiming otherwise is unauthorized and should be treated as a scam. The only ways to support the project are the Ko-fi link below and contributing on GitHub.
+## 中国地区适配内容
 
-## Does it actually work?
+- 覆盖日常实习、寒暑假实习、校园招聘、管培项目和早期社会招聘。
+- 聚合公司官网和校招页、公共就业服务、高校就业中心、公开招聘平台页面、
+  搜索引擎可索引的公众号与招聘公告。
+- 使用城市、到岗时间、每周出勤、实习时长、毕业届次、截止日期、薪资、转正
+  机会、岗位类别、行业、公司规模和来源可信度等中国求职字段。
+- 对跨来源结果执行去重、可信度标记、过期检测、人工复核与优先级排序。
+- 不绕过登录、验证码、App、小程序、访问频率或其他平台控制；受限来源降级为
+  搜索线索、人工打开或粘贴职位描述。
+- 为 Codex 提供 `$setup`、`$scrape`、`$rank`、`$apply`、`$upskill`、
+  `$interview` 和 `$outcome` 的可发现入口，同时保持 canonical workflow 的
+  single-source-of-truth 架构。
 
-I'm a geophysicist by training. When my position was cut in late 2025, I built this framework to run my own job search - the same `/scrape`, `/apply`, and `/interview` workflow in this repo, used weekly, on my own career. I was upfront about it with every employer I spoke to, and instead of counting against me, it usually sparked a genuine technical conversation.
+当前默认预设是 `sports_business_v1`：体育商务 → 体育营销 → 赛事商务 →
+赞助/Partnership → 电竞商务 → 体育平台商业运营 → 体育品牌 Marketing →
+SportsTech 产品运营。使用 `$scrape broad` 可以临时扩大到其他行业、通用非技术
+岗位及技术岗位，而不会覆盖保存的默认方向。
 
-Sixty-nine tailored applications, twenty first interviews, and one signed contract later, I started as an AI engineer in June 2026. People kept asking whether this actually works. It got me hired. Now it's yours.
+## 上游项目与署名
 
-*The longer version, including the full application funnel, is on [LinkedIn](https://www.linkedin.com/in/mads-lorentzen/).*
+本适配版基于 Mads Lorentzen 创建的 MIT 许可项目。上游作者公开记录了使用原始
+工作流完成 69 次定制申请、获得 20 次首轮面试并最终签约的经历；这些结果属于
+上游作者，不是本适配版对求职结果的保证。详情可查看
+[上游仓库](https://github.com/MadsLorentzen/ai-job-search)及其
+[LinkedIn 说明](https://www.linkedin.com/in/mads-lorentzen/)。原始 MIT
+许可证和版权声明保留在本仓库的 `LICENSE` 中。
 
-<p align="center">
-  <i>Did this save you a Sunday of cover-letter writing? Consider a coffee.<br>
-  Did it land you the job? Maybe two.</i> ☕
-</p>
-
-<p align="center">
-  <a href="https://ko-fi.com/madslorentzen">
-    <img src="https://storage.ko-fi.com/cdn/kofi3.png?v=6" alt="Buy me a coffee at ko-fi.com" height="40">
-  </a>
-</p>
+> 本项目与 OpenAI、Anthropic、招聘平台或任何用人单位均无隶属、认可或赞助
+> 关系。Codex、Claude Code 及招聘平台名称仅用于描述兼容工具和公开来源策略。
+> 本项目没有关联加密货币、Token 或付费赞助计划。
 
 ## What this is
 
-A structured workflow that turns Claude Code into a full-stack job application assistant. The core workflow (self-profiling, fit evaluation, and the drafter-reviewer application pipeline) is **language- and country-agnostic**. The job portal search skills are built for the Danish market (Jobindex, Jobnet, Akademikernes Jobbank, etc.), but the pattern is designed to be swapped for your local job boards.
+A structured workflow that turns Claude Code or Codex into a full-stack job
+application assistant. The core workflow remains **language- and
+country-agnostic**. This enhanced fork adds a broad mainland-China search
+strategy for internships, campus/graduate recruitment, and early-career roles
+while retaining the Danish examples and the extension model for any market.
+
+The current default preset is `sports_business_v1`: 体育商务 → 体育营销 →
+赛事商务 → 赞助/Partnership → 电竞商务 → 体育平台商业运营 → 体育品牌
+Marketing → SportsTech 产品运营. The source and record architecture remains
+general; `/scrape broad` expands beyond the preset for that run.
 
 ```
 /setup          /scrape              /apply <url>
@@ -61,7 +84,10 @@ The framework encodes career guidance best practices, including structured evalu
 
 ## Prerequisites
 
-- [Claude Code](https://claude.com/claude-code) (CLI). Using a different agent tool (Codex, Antigravity, Gemini CLI)? Start at [`AGENTS.md`](AGENTS.md) - the portal search skills work there out of the box, and [community forks](https://github.com/MadsLorentzen/ai-job-search/discussions/78) adapt the full workflow.
+- [Claude Code](https://claude.com/claude-code) or Codex. Codex users start at
+  [`AGENTS.md`](AGENTS.md) and [`CODEX.md`](CODEX.md); portable thin-pointer
+  skills expose the full setup/scrape/rank/apply/upskill/interview/outcome
+  workflow without duplicating its canonical specifications.
 - Python 3.10+
 - [Bun](https://bun.sh) (for job search CLI tools)
 - LaTeX distribution with `lualatex` and `xelatex`: [TeX Live](https://tug.org/texlive/), [MacTeX](https://tug.org/mactex/), [TinyTeX](https://yihui.org/tinytex/), or [MiKTeX](https://miktex.org/). The CV compiles with `lualatex` (pdflatex often fails on modern MiKTeX installs with `fontawesome5` font-expansion errors); the cover letter compiles with `xelatex` because `cover.cls` requires `fontspec`. If using a minimal TeX install such as TinyTeX or BasicTeX, install the extra packages listed in [SETUP.md](SETUP.md#minimal-tex-install-tinytexbasictex).
@@ -71,12 +97,17 @@ The framework encodes career guidance best practices, including structured evalu
 
 > 🎥 **Prefer to see it in action first?** [The Next New Thing did a hands-on walkthrough](https://www.youtube.com/watch?v=HoVxjMNFYv4) of how the workflow is actually used, from setup to a finished application (recorded August 2026 - commands may have evolved since).
 
-### 1. Fork and clone
+### 1. Clone the China adaptation
 
 ```bash
-gh repo fork MadsLorentzen/ai-job-search --clone
-cd ai-job-search
+git clone https://github.com/limuchuan0619/ai-job-search-china.git
+cd ai-job-search-china
 ```
+
+Until the public repository is created, contributors can work from a local
+checkout or fork the
+[upstream project](https://github.com/MadsLorentzen/ai-job-search) and apply
+this adaptation's changes on a dedicated branch.
 
 ### 2. Install job search tools
 
@@ -111,6 +142,11 @@ claude
 
 `/setup` offers three paths: read your `documents/` folder if you have one populated (CV PDF, LinkedIn export, diplomas, reference letters, past applications), import a single CV pasted in chat, or walk through an interview. It auto-detects what you have and asks. Documents-folder mode is idempotent and safe to re-run as you add more material; see `documents/README.md` for the layout.
 
+In Codex, invoke `$setup` or say “Read AGENTS.md and execute the canonical setup
+workflow.” The search section captures China-relevant availability, internship
+schedule, graduation cohort, compensation, remote policy, conversion preference,
+role families, industries, cities, and company-size scope.
+
 ### 4. Search for jobs
 
 ```bash
@@ -118,6 +154,13 @@ claude
 ```
 
 This searches multiple job portals for positions matching your profile, deduplicates results, and presents them sorted by fit. Pick a match to run `/apply` on it directly — or, when a scrape returns more jobs than you want to eyeball, run `/rank` to batch-score them all against the fit framework and get a ranked shortlist first.
+
+The enabled `china-job-search` strategy also searches public employment
+services, employer career/campus pages, publicly indexed platform pages,
+university career centers, and recruitment announcements. It labels source
+confidence, detects expiry, merges cross-source duplicates, and separates
+login/CAPTCHA/app-only leads for manual review. Use `/scrape broad` (Claude) or
+`$scrape broad` (Codex) to rotate across all configured functions and industries.
 
 ### 5. Apply to a job
 
@@ -156,6 +199,7 @@ Postings are treated as untrusted input (the workflow follows no instructions em
 
 ```
 ai-job-search/
+├── CODEX.md                           # Codex quick start and invocation map
 ├── CLAUDE.md                          # Main candidate profile + workflow rules
 ├── .claude/
 │   ├── commands/
@@ -185,6 +229,8 @@ ai-job-search/
 │   │   └── upskill/                   # /upskill skill gap analysis and learning plan
 │   └── settings.json                  # Claude Code permissions (shared, scoped)
 ├── .agents/skills/                    # Job portal CLI tools
+│   ├── setup|scrape|rank|.../         # Codex thin pointers to canonical workflows
+│   ├── china-job-search/              # China public multi-source WebSearch strategy
 │   ├── jobbank-search/                # Akademikernes Jobbank (Denmark)
 │   ├── jobdanmark-search/             # Jobdanmark.dk (Denmark)
 │   ├── jobindex-search/               # Jobindex.dk (Denmark)
@@ -289,6 +335,18 @@ If you prefer doing it by hand, the manual route still works: update the guidanc
 
 ### Job search tools
 
+This fork supports two source-adapter forms. CLI adapters provide structured
+`search`/`detail` commands; WebSearch adapters define legal public-source and
+fallback strategies. `/scrape` discovers only `kind: job-source` skills (plus
+legacy skills with a `cli/` directory), so Codex workflow-pointer skills are
+never mistaken for portals.
+
+`china-job-search` is enabled by default and is deliberately not a brittle
+site scraper. It builds broad queries from the user's role, industry, city,
+availability, and graduation preferences; discovers companies generically;
+prefers official employer and public-service pages; and uses indexed snippets or
+manual JD paste when a platform requires login, CAPTCHA, an app, or WeChat.
+
 The four Danish CLI tools in `.agents/skills/` (Jobbank, Jobdanmark, Jobindex, Jobnet) demonstrate the pattern for building a job-portal integration for a specific market. If you're in a different country, run:
 
 ```
@@ -301,14 +359,25 @@ Maintaining a fork adapted to your market or language? Add it to the [Community 
 
 For **country-agnostic** starting points outside Denmark, the repo ships two portal skills alongside the Danish demos:
 
-- **`linkedin-search`** — built on LinkedIn's public, unauthenticated `jobs-guest` endpoints. Field-agnostic, **zero runtime dependencies** (runs with just `bun`), and takes the search location as an explicit flag, so it works for any market out of the box (`-l "Berlin, Germany"`, `-l "Mumbai, Maharashtra, India"`, `-l "Remote"`, …). Intended for **personal use only** — automated access is against LinkedIn's Terms of Service, so keep volume low. See `.agents/skills/linkedin-search/SKILL.md`.
+- **`linkedin-search`** — built on LinkedIn's public, unauthenticated
+  `jobs-guest` endpoints. It remains available as a country-agnostic worked
+  example but is **disabled by default in this fork** because automated access
+  conflicts with LinkedIn's Terms of Service. The China strategy uses ordinary
+  public WebSearch, employer redirects, and manual signed-in browsing instead.
+  A user who knowingly opts into personal low-volume use can flip `enabled`.
+  See `.agents/skills/linkedin-search/SKILL.md`.
 - **`freehire-search`** — queries the [freehire.me](https://freehire.me) aggregator's public REST API (JSON, no API key). Tech-focused (software, data, engineering, DevOps, remote), multi-market via facet flags (`--region`, `--country`, `--remote`), and **zero runtime dependencies**. Unlike the HTML-scraping Danish portals, results come back structured (skills, seniority, category). The backend is MIT-licensed and [self-hostable](https://github.com/strelov1/freehire) — point `FREEHIRE_API_URL` at your own instance if you prefer. See `.agents/skills/freehire-search/SKILL.md`.
 
 ### Extending the framework: portals, templates, criteria - and borrowing from other forks
 
 Everything above adds up to an extension model, so here it is stated plainly. The framework has three extension points, and none of them require touching upstream:
 
-1. **Portal skills** - the module system for job boards. Every `*-search` skill is a self-contained folder under `.agents/skills/` with the same contract (a `search`/`detail` CLI, `--format json|table|plain` output, an `enabled:` flag in its `SKILL.md`, its own tests). `/scrape` auto-discovers any installed skill that follows the contract - nothing to register, nothing to wire up. `/add-portal` generates new ones; the [community portal index](https://github.com/MadsLorentzen/ai-job-search/discussions/78) catalogs the ones other forks have built.
+1. **Job-source skills** - the module system for search providers. A source can
+   be a structured CLI (`execution: cli`) or a public WebSearch strategy
+   (`execution: web-search`); both declare `kind: job-source`, `enabled`, market,
+   and access boundaries. Legacy CLI portals remain compatible. `/add-portal`
+   generates a new CLI source; the [community portal index](https://github.com/MadsLorentzen/ai-job-search/discussions/78)
+   catalogs adapters other forks have built.
 2. **Document templates** - `/add-template` registers any CV or cover-letter toolchain that compiles to PDF from the command line, LaTeX or otherwise.
 3. **Evaluation criteria** - deal-breakers and preferences in your profile are free-form, and the evaluation rubric scores against whatever you put there. "Strong parental-leave terms", "minimum salary X per my union's scale", "no on-call" - each is one profile line, no code, and it carries real weight in `/rank` and `/apply` fit evaluations. Language is the one deal-breaker type with dedicated, structured handling: `/setup` captures every language you work in and your level (asked directly, or inferred from your CV/LinkedIn export) into a `Languages` table, and the Language Gate (`04-job-evaluation.md`) hard-rejects a posting that requires a language you haven't declared at all, while flagging - not auto-rejecting - one that asks for a higher level than you declared in a language you do work in, so a borderline case (a strict "fluent" bar against your own B1/B2, say) gets your judgment instead of a silent drop.
 

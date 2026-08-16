@@ -307,14 +307,49 @@ For each reference:
 - Relationship to the user
 
 ### Section 9: Job Search Configuration
-This section generates the search queries that power `/scrape`. Use the information from Sections 1, 4, and 7 to build targeted queries.
+This section populates the authoritative Search Preference Profile and query
+families that power `/scrape`. Use the information from Sections 1, 4, and 7.
+Respect an existing named focus preset unless the user asks to replace it. This
+fork starts with `sports_business_v1`; `/scrape broad` expands a run without
+overwriting that saved focus.
 
 Ask about:
-- **Role titles to search for:** "What job titles should I search for? For example: Data Scientist, ML Engineer, Geophysicist." Collect 3-8 specific titles.
+- **Role families and titles:** Ask for desired functions and specific titles.
+  Collect primary and adjacent families. For China-market non-technical search,
+  prompt across business/BD/sales/partnerships, marketing/brand/growth,
+  operations/content/community/e-commerce, product/project/user research,
+  strategy/commercial analysis/consulting, customer success, events/sports/media,
+  and general management-trainee tracks. Preserve technical roles as
+  `included`, `optional`, or `excluded` rather than assuming either direction.
 - **Key skills as search terms:** "Which of your skills are most likely to appear in job postings?" Pick 3-5 that are distinctive and searchable.
-- **Target companies (optional):** "Are there specific companies you'd like to monitor for openings?"
-- **Geographic scope:** "Which cities or regions should I search in? How far are you willing to commute?" Use this to define the location filter tiers (ideal, acceptable, borderline, too far).
-- **Job portals:** "The framework ships country-agnostic search CLIs (`linkedin-search`, `freehire-search`, enabled by default) plus Danish portal demos (Jobindex, Jobbank, Jobdanmark, Jobnet) that ship **disabled**. `/scrape` auto-discovers whatever portal skills are installed under `.agents/skills/` and skips any with `enabled: false`. Which portals fit your market?" **Then act on the answer:** if the user's market is Denmark (or they ask for the Danish boards), edit each of the four Danish `SKILL.md` files and set `enabled: true` in the frontmatter; otherwise leave them disabled and say so - they cost nothing while disabled and can be enabled later by flipping the flag. If the user needs a local board that is not shipped, guide them to `/add-portal` (market-specific skills live in their fork). WebSearch/`site:` queries remain the fallback for portals without a CLI skill.
+- **Industries:** Ask for preferred and explicitly excluded industries. Explain
+  that broad mode also rotates through adjacent industries and company types so
+  results are not dominated by a few large technology employers.
+- **Company scope:** Ask whether any employers need monitoring, but do not
+  require a target-company list. Record desired company sizes/stages (startup,
+  growth, SME, large, multinational, SOE, public institution, nonprofit). The
+  China source skill discovers official career pages generically from industry
+  and city results.
+- **Job cycle:** Ask which of daily/off-cycle internship, summer internship,
+  winter internship, campus/spring/autumn recruitment, graduate programs, and
+  early-career social recruitment are allowed.
+- **Geographic scope:** Ask for ideal and acceptable cities/regions, commute
+  constraints, and whether remote/hybrid work is acceptable.
+- **Availability:** Ask earliest start date, minimum days per week, minimum
+  internship duration, and whether the user is limited to summer/winter breaks.
+- **Eligibility:** Ask education level, current year of study, and graduation
+  cohort(s) used by campus-recruitment filters.
+- **Compensation and conversion:** Ask optional daily/monthly minimums, whether
+  unpaid roles are allowed, and whether a conversion/return-offer opportunity is
+  required, preferred, or irrelevant.
+- **Job sources:** "The framework ships country-agnostic CLIs, an enabled China
+  multi-source WebSearch strategy, and disabled Danish portal demos. Which
+  sources fit your market?" **Then act on the answer:** `/scrape` treats only
+  `kind: job-source` skills and legacy skills with `cli/` as sources. Keep
+  `china-job-search` enabled for mainland-China searches. If the market is
+  Denmark, enable the four Danish sources. Otherwise leave them disabled. Use
+  `/add-portal` for another public portal. Search-engine and pasted-JD fallbacks
+  remain available for login/CAPTCHA/app-only sources.
 - **CV language:** "Should your CVs be written in English (the default, accepted in most markets), or in your market's language?" Record the answer as a `CV language: <language>` line in CLAUDE.md's Identity section. Cover letters always match each posting's language automatically; this setting governs the CV only. If the user is unsure, keep English and note they can re-run `/setup --section search` to change it.
 
 **Important:** Also suggest role types the user may not have considered, based on their skill profile. For example:
@@ -357,16 +392,23 @@ Create STAR examples from their actual experience (at least 3-4 examples). Path 
 Replace placeholder personal data with their actual name, contact info, and add their education and most recent experience entries.
 
 ### 8. Generate `.claude/skills/job-scraper/search-queries.md`
-Replace all placeholder tokens in the search queries file with the user's actual information from Section 9 (or the equivalent follow-up questions in Path A's Step A7):
-- Replace `[YOUR_PRIMARY_ROLE_TYPE]`, `[YOUR_PRIMARY_JOB_TITLE]`, etc. with actual role titles
-- Replace `[YOUR_KEY_SKILL]`, `[YOUR_DOMAIN_KEYWORD_1]`, etc. with actual skills and domain terms
-- Replace `[YOUR_CITY]`, `[YOUR_COUNTRY]`, `[YOUR_REGION]` with actual location
-- Fill in the location filter tiers (ideal, acceptable, borderline, too far) based on commute constraints
-- Organize queries into priority categories matching the user's career direction:
-  - Priority 1: Their strongest/most desired role direction
-  - Priority 2: Their domain expertise
-  - Priority 3: Adjacent roles they could pivot into
-  - Priority 4: Broader roles (wider net)
+Replace the placeholders in the search file from Section 9 (or Path A Step A7):
+- Fill every value in the Search Preference Profile, using `unknown` for facts
+  the user did not provide. Never invent availability, compensation, or
+  eligibility constraints.
+- Preserve the user's chosen `focus_preset` and `broad_search` value. For this
+  fork, keep `sports_business_v1` and `broad_search: false` until the user asks
+  to broaden or replace the default profile.
+- Populate primary and adjacent role families, key skills, preferred/excluded
+  industries, company-size scope, job cycles, ideal/acceptable cities, remote
+  policy, availability, education/year/cohort, compensation, conversion
+  preference, and recency.
+- Replace query placeholders with Chinese and common English title variants
+  appropriate to the selected market and languages.
+- Keep the generic company-career discovery and seasonal sweep categories. A
+  target-company list augments them; it never replaces broad discovery.
+- Preserve source boundaries and fallback instructions. They are framework
+  rules, not user-specific content.
 
 ---
 

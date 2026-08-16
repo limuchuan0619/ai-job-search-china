@@ -6,6 +6,8 @@ Run from anywhere: python tools/lint_skills.py
 Checks:
 - Every SKILL.md (.claude/skills/*, .agents/skills/*) has YAML frontmatter that
   parses, with non-empty `name` and `description` keys
+- Portable `kind: workflow` skills point at an existing canonical file and
+  `kind: job-source` skills declare a supported execution mode
 - `allowed-tools` entries of the form `Bash(bun run <path> *)` point at files
   that exist (skill paths resolve relative to the repo root and to .agents/)
 - Every .claude/commands/*.md starts with a `# /<name>` title
@@ -52,6 +54,34 @@ def check_skill(path: Path) -> None:
     for key in ("name", "description"):
         if not data.get(key):
             errors.append(f"{rel(path)}: frontmatter missing required key '{key}'")
+
+    kind = data.get("kind")
+    if kind == "workflow":
+        canonical = data.get("canonical")
+        if not isinstance(canonical, str) or not canonical.strip():
+            errors.append(f"{rel(path)}: workflow skill missing canonical pointer")
+        else:
+            target = ROOT / canonical
+            if not target.is_file():
+                errors.append(
+                    f"{rel(path)}: workflow canonical pointer does not exist: {canonical}"
+                )
+            elif canonical not in text:
+                errors.append(
+                    f"{rel(path)}: workflow body must name its canonical pointer: {canonical}"
+                )
+    elif kind == "job-source":
+        execution = data.get("execution")
+        if execution not in {"cli", "web-search", "manual"}:
+            errors.append(
+                f"{rel(path)}: job-source execution must be cli, web-search, or manual"
+            )
+        if "enabled" in data and not isinstance(data["enabled"], bool):
+            errors.append(f"{rel(path)}: job-source enabled must be a boolean")
+        if execution == "cli" and not (path.parent / "cli" / "src" / "cli.ts").is_file():
+            errors.append(
+                f"{rel(path)}: cli job-source is missing cli/src/cli.ts"
+            )
 
     allowed = data.get("allowed-tools", "")
     if isinstance(allowed, str):

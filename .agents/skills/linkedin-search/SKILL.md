@@ -11,7 +11,10 @@ description: >
   positions open, remote jobs, "are there any X jobs in <place>", look up this
   job posting.
 context: fork
-enabled: true  # set to false to keep this portal installed but have /scrape skip it
+kind: job-source
+execution: cli
+market: global
+enabled: false  # opt-in: automated guest-endpoint access conflicts with LinkedIn ToS; China search uses public WebSearch/manual fallback by default
 allowed-tools: Bash(bun run .agents/skills/linkedin-search/cli/src/cli.ts *)
 ---
 

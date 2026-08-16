@@ -13,6 +13,16 @@ per-file diff commands.
 
 ## [Unreleased]
 
+### Added
+
+- **AI Job Search China public adaptation** - positions this fork explicitly as
+  a mainland-China market adaptation of `MadsLorentzen/ai-job-search`, with
+  Codex workflow discovery, public and official China-source strategies,
+  China-specific internship and campus-recruitment fields, cross-source
+  deduplication, trust and expiry controls, and the `sports_business_v1`
+  default preset. The upstream country-agnostic workflows and extension model
+  remain available.
+
 ### Changed
 
 - **CONTRIBUTING: invited PRs are reserved for the invitee** - when a maintainer comment

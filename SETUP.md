@@ -1,10 +1,12 @@
-# Setup Guide
+# AI Job Search China Setup Guide
 
-Step-by-step instructions for getting the AI Job Search framework running.
+Step-by-step instructions for running the mainland-China adaptation of the AI
+Job Search framework. China-market search is enabled by default, while the
+upstream country-agnostic workflows and extension model remain available.
 
 ## 1. Prerequisites
 
-### Claude Code
+### Claude Code or Codex
 
 Install Claude Code (Anthropic's CLI for Claude):
 
@@ -13,6 +15,11 @@ npm install -g @anthropic-ai/claude-code
 ```
 
 You'll need an Anthropic API key or a Claude Pro/Team subscription. See the [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code) for details.
+
+For Codex, open this repository as the workspace. Codex reads `AGENTS.md`; use
+`CODEX.md` for `$setup`, `$scrape`, `$rank`, `$apply`, `$upskill`, `$interview`,
+and `$outcome` examples. The portable skills are thin pointers to the same
+canonical workflow files Claude uses.
 
 ### Python
 
@@ -183,7 +190,11 @@ done
 
 For `linkedin-search` and `freehire-search` the install is optional: both have zero runtime dependencies and run with plain `bun`; `bun install` only pulls TypeScript dev types.
 
-If you're outside Denmark, you can generate an equivalent search skill for your local job board with `/add-portal` — it scaffolds the same CLI structure for any public portal and test-runs a live query before registering. See the "Job search tools" section in the README.
+For mainland China, no extra package is required for `china-job-search`: it is a
+public WebSearch strategy, enabled by default, and uses manual fallback for
+login/CAPTCHA/app/mini-program walls. If you need another public portal in any
+market, `/add-portal` scaffolds a CLI adapter and test-runs it before registering.
+See the "Job search tools" section in the README.
 
 ## 4. Run the setup interview
 
@@ -199,7 +210,16 @@ Then run the onboarding:
 /setup
 ```
 
-Claude will offer three paths:
+Or in Codex:
+
+```text
+$setup
+```
+
+If `$` completion is unavailable, say: `Read AGENTS.md and execute the canonical
+setup workflow.`
+
+The agent will offer three paths:
 
 - **Path A (documents folder):** Add your CV, LinkedIn export, diplomas, references, or past applications under `documents/`. Claude reads and cross-references them before proposing profile updates. This is best when you have several source files.
 - **Path B (single CV import):** Share one CV/resume by mentioning the file with `@` or pasting the text. Claude extracts it and asks follow-up questions for anything missing.

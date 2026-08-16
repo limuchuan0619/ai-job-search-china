@@ -1,10 +1,11 @@
 ---
 name: scrape
 description: >
-  Finds new job postings matching your profile via installed portal-search CLIs
-  (LinkedIn, local job boards, and any skills added with /add-portal). Deduplicates
-  across runs. Triggers on: job scrape, find jobs, search jobs, new jobs, job search,
-  scrape jobs, /scrape
+  Finds new job postings matching your profile via installed CLI, WebSearch,
+  and manual-fallback job sources. Normalizes China internship/graduate fields,
+  deduplicates across sources and runs, checks trust and expiry, and prioritizes
+  results. Triggers on: job scrape, find jobs, search jobs, new jobs, job search,
+  internships, campus recruitment, scrape jobs, /scrape
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(bun --version), Bash(bun run .agents/skills/*/cli/src/cli.ts *), WebFetch, WebSearch, Agent, AskUserQuestion
 ---
 
@@ -14,10 +15,11 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(bun --version), Bash(bun run 
 
 ## How It Works
 
-This skill searches job portals using the **installed portal-search CLIs** in
-`.agents/skills/` (plus WebSearch as a fallback), using queries from your profile.
-It deduplicates against previously seen jobs and the application tracker, and
-presents new matches with a quick fit assessment.
+This skill orchestrates installed **job-source skills** in `.agents/skills/`.
+Sources may be CLIs, public WebSearch strategies, or manual fallbacks. It uses
+the authoritative preferences in `search-queries.md`, merges duplicates across
+sources, validates freshness and source confidence, and presents a prioritized
+set with a quick fit assessment.
 
 ## Invocation
 
@@ -41,12 +43,27 @@ Optional arguments:
 1. Read `job_scraper/seen_jobs.json` (create if missing - start with `{"seen": {}}`)
 2. Read `job_search_tracker.csv` to extract already-applied companies+roles
 3. Read `search-queries.md` (this directory) for the search strategy
+4. Read `.claude/skills/job-application-assistant/01-candidate-profile.md` and
+   `04-job-evaluation.md` for eligibility, deal-breakers, and quick fit. Do not
+   mutate either file during a scrape.
 
 ### Step 1: Search
 
 Read `search-queries.md` (this directory) for the search strategy. By default, run the top 3 priority query categories. If the user said "broad", run all categories. If the user specified a focus area (e.g. "data science"), prioritize queries from that category.
 
-**Use the installed CLI tools as the primary search mechanism.** Fall back to `WebSearch` only for portals that do not have a CLI skill, or if `bun` is unavailable on the system.
+Discover skills under `.agents/skills/*/SKILL.md`, then classify them:
+
+- A skill is a search source when frontmatter has `kind: job-source`, or, for
+  backward compatibility, when its directory contains `cli/`.
+- `kind: workflow` files are thin discovery pointers. Never execute them as
+  portals or include them in the disabled-source report.
+- `execution: cli` (and legacy `cli/` sources) runs in Step 1b.
+- `execution: web-search` runs its documented strategy in Step 1c.
+- `execution: manual` is listed as an available fallback and makes no automated
+  request.
+
+Honor `enabled: false` only for search sources. A missing `enabled` key means
+enabled.
 
 #### 1a. Check bun availability
 
@@ -54,19 +71,20 @@ Read `search-queries.md` (this directory) for the search strategy. By default, r
 bun --version
 ```
 
-If this fails (bun not installed), skip to **1c (WebSearch fallback)** for all portals and note the fallback in the Step 5 output.
+Run this check only when at least one enabled CLI source exists. If it fails,
+skip CLI sources to **1c (WebSearch fallback)** and note the fallback in Step 5.
 
 #### 1b. Run CLI tools (primary — run these in parallel where possible)
 
-Discover all installed portal CLI skills by reading every `SKILL.md` found under `.agents/skills/*/SKILL.md`. Each file documents that portal's exact CLI flags and usage examples. **Use each portal's own documented interface — do not guess flags.** This approach automatically includes any new portals added via `/add-portal` without requiring changes to this file.
+For enabled CLI sources, read the source's `SKILL.md` for its exact flags and
+usage. **Do not guess flags.** Skills added with `/add-portal` remain automatic.
 
-**Honor the `enabled` toggle.** A portal is enabled unless its `SKILL.md` frontmatter sets `enabled: false` (a missing key means enabled — the default). Skip each disabled portal and record it for the Step 5 summary. A fork can thus keep a portal installed but sit out a run without deleting its directory.
-
-For each **enabled** portal skill:
+For each **enabled CLI source**:
 
 1. Read its `SKILL.md` to find the correct `bun run …` invocation and supported flags.
 2. Translate the query terms from `search-queries.md` into that portal's flag format (e.g. `--key`, `--search-string`, `--query`, filter codes — whatever the portal's SKILL.md specifies).
-3. Scope to the last 14 days using the portal's supported recency flag (`--jobage`, `--since <YYYY-MM-DD>`, `--order PublicationDate`, etc. — as documented per portal).
+3. Scope to `recency_days` from the Search Preference Profile using the source's
+   documented recency flag (`--jobage`, `--since`, ordering, etc.).
 4. Cap results to ~20 per call using the portal's limit flag.
 5. Use `--format json` for machine-readable output.
 
@@ -77,11 +95,15 @@ If a CLI tool exits with a non-zero code, log the error message and continue —
 #### 1c. WebSearch fallback
 
 Use `WebSearch` for:
-- Portals listed in `search-queries.md` that do **not** have a corresponding directory under `.agents/skills/`
-- Any portal whose CLI fails at runtime
-- When bun is unavailable (Step 1a failed)
 
-Use the site-specific query strings from `search-queries.md` directly as WebSearch queries for these portals.
+- every enabled source whose frontmatter says `execution: web-search`; follow
+  its own source tiers, query construction, and access policy
+- sites/query families in `search-queries.md` without a CLI adapter
+- any CLI source that fails, or all CLI sources when bun is unavailable
+
+Use the saved query families directly and tag each result with its producing
+source skill/query. A WebSearch source may cover many sites; it is still one
+strategy, not permission to crawl those sites.
 
 ### Step 2: Fetch & Parse
 
@@ -92,10 +114,13 @@ and URL. For jobs worth a deeper look, fetch full detail with that portal's `det
 command (see its SKILL.md — do not guess flags) to extract **key requirements**,
 **application deadline**, and a brief description snippet.
 
-**From WebSearch results:** Use `WebFetch` on the posting URL and extract the same
-fields manually. If it returns HTTP 403, retry with browser headers via curl per
-`.claude/skills/job-application-assistant/09-web-research.md` before giving up — most
-bank and corporate sites reject WebFetch's user agent while serving browsers normally.
+**From WebSearch results:** Pre-filter by title/snippet. For promising results,
+use `WebFetch` only when the source strategy and the robots/terms gate in
+`.claude/skills/job-application-assistant/09-web-research.md` allow it. On a
+login, CAPTCHA, app, mini-program, or interactive-verification wall, stop. Keep
+the result as a `snippet_only` lead for manual review or drop it; never bypass
+the control. A permitted HTTP 403 retry may use the gated browser-header path in
+`09-web-research.md`.
 
 **Store a URL that actually resolves to the posting.** A listing-page URL with a
 `#fragment` appended (`.../jobs/ciso/#ikerian`) is not a posting: it fetches fine and
@@ -104,11 +129,80 @@ that entry. When WebSearch only yields a listing page, search the employer's own
 site for the role and store that URL instead, or drop the candidate rather than saving a
 fragment link.
 
-For every candidate:
-- Skip if the URL or company+title combo already exists in `seen_jobs.json`
-- Skip if the company+role already appears in `job_search_tracker.csv`
+### Step 2.25: Normalize the job record
 
-### Step 2.5: Mass-Posting Detection (within this run)
+Every candidate uses this additive schema. Values omitted by the posting are
+`null`/`unknown`, never inferred as fact:
+
+```json
+{
+  "title": "...",
+  "company": "...",
+  "canonical_url": "https://.../specific-posting",
+  "source_urls": ["https://..."],
+  "source": "china-job-search",
+  "source_tier": "A/B/C",
+  "source_publisher": "...",
+  "source_confidence": "high/medium/low",
+  "evidence_status": "verified_detail/snippet_only/manual_review_required",
+  "requisition_id": "...",
+  "published_date": "YYYY-MM-DD or unknown",
+  "deadline": "YYYY-MM-DD or unknown",
+  "date_status": "fresh/active_deadline/unknown/stale/expired/closed",
+  "city": "...",
+  "workplace": "...",
+  "remote_policy": "remote/hybrid/on_site/unknown",
+  "arrival_date": "YYYY-MM-DD or text or unknown",
+  "days_per_week": "number/range/unknown",
+  "internship_duration_months": "number/range/unknown",
+  "season_eligibility": ["summer", "winter", "off_cycle"],
+  "education": "...",
+  "year_of_study": "...",
+  "graduation_cohort": "...",
+  "salary_daily_cny": "number/range/unknown",
+  "salary_monthly_cny": "number/range/unknown",
+  "conversion_opportunity": "yes/no/possible/unknown",
+  "job_cycle": "internship/campus/graduate/early_career/experienced/unknown",
+  "role_family": "...",
+  "industry": "...",
+  "company_size": "...",
+  "application_route": "official_site/platform/email/manual/unknown",
+  "requirements": ["..."],
+  "fit": "high/medium/low",
+  "search_priority": 0,
+  "first_seen": "YYYY-MM-DD",
+  "last_verified": "YYYY-MM-DD",
+  "status": "new/skipped/ranked/expired"
+}
+```
+
+Keep the legacy `url` and `portal` aliases when writing `seen_jobs.json` so old
+readers remain compatible: `url = canonical_url`; `portal = source`.
+
+### Step 2.5: Cross-source deduplication and consolidation
+
+Normalize before comparing:
+
+1. Canonicalize URLs: remove tracking parameters and fragments, normalize the
+   host/path, and prefer the employer detail URL over an aggregator URL.
+2. Normalize titles and company names case-insensitively, whitespace and
+   punctuation-insensitively. Legal suffixes may be ignored for matching, but
+   never collapse named subsidiaries or business units into a parent company.
+3. Treat an exact canonical URL or the same source+requisition ID as a duplicate.
+4. Otherwise merge only when normalized company + substantially equivalent
+   title + compatible city/work-mode identify the same opening. Similar titles
+   at the same employer are not enough when IDs, locations, or descriptions
+   conflict.
+5. On merge, preserve every URL in `source_urls`, the richest non-conflicting
+   fields, the most authoritative canonical URL, and the highest supported
+   confidence. Record conflicting deadline/salary/location values for manual
+   review; never pick one silently.
+6. Exclude a consolidated record from presentation if any alias already exists
+   in `seen_jobs.json`, or its normalized company+role already exists in
+   `job_search_tracker.csv`. Still update `last_verified` and merged source
+   evidence without dropping prior rank fields.
+
+### Step 2.75: Mass-Posting Detection (within this run)
 
 A distribution pattern worth flagging to the user as a caution signal, not as an accusation against the employer - it describes how a listing is being distributed, not a verdict on whether the company is legitimate. It alone proves nothing is wrong (companies do legitimately hire the same role across several cities); flag it so the user can factor it in when deciding whether to invest time, don't downgrade fit or silently exclude the result because of it.
 
@@ -124,9 +218,50 @@ For each new job, do a rapid fit check (NOT the full evaluation from `04-job-eva
 
 **Language override:** before assigning a match level, check the posting against `04-job-evaluation.md`'s Language Gate (a required language you haven't declared at all in your CLAUDE.md Languages table). A required language that's entirely undeclared overrides skill fit: mark it **Low** regardless of how well the skills align, and name it in the highlight bullets so it isn't buried under an otherwise-good-looking match. A **declared** language at a requirement that reads higher than your declared level is *not* an override — score fit normally, but add a red-flag bullet under that job's highlights (Step 5) quoting the posting's requirement next to your declared level, so the gap is visible without being auto-downgraded.
 
+Apply the Search Preference Profile to city, remote policy, arrival date, weekly
+attendance, duration, season, education/year/cohort, compensation, job cycle,
+and conversion opportunity. An explicit deal-breaker mismatch is excluded. An
+unknown or soft mismatch stays visible with a flag.
+
+### Step 3.5: Trust, expiry, and search priority
+
+**Source confidence:**
+
+- `high`: verified employer-owned detail page, official public-employment page,
+  or official recruitment announcement with a verifiable application route
+- `medium`: public platform detail page naming the employer and role, or a
+  credible announcement corroborated by another source
+- `low`: search snippet only, uncorroborated repost, anonymous employer, missing
+  application route, or conflicting material fields
+
+Confidence describes evidence, not whether the employer is "good." Never call a
+company fraudulent from a low-confidence source label.
+
+**Expiry:** set `closed`/`expired` when the source says so or a stated deadline
+has passed. A reachable live detail page with a future deadline is
+`active_deadline` regardless of publication age. A posting older than
+`recency_days` without a future deadline is `stale` and requires verification;
+an unknown date is `unknown`, not fresh. Exclude `closed` and `expired`; lower
+priority for `stale` and `unknown`.
+
+**Search priority (0-100):** this is a triage score, not `/rank`'s full fit score.
+Use one transparent score per record:
+
+- quick candidate fit: 0-40 (high 40, medium 25, low 10)
+- hard/soft preference alignment: 0-25
+- freshness/deadline urgency: 0-15
+- source confidence: 0-15 (high 15, medium 9, low 3)
+- field completeness/application readiness: 0-5
+
+An explicit deal-breaker or expired/closed state vetoes presentation rather than
+being hidden inside the number. Store the component reasons so ties are
+explainable. Sort by `search_priority`, then future deadline urgency, then
+publication date. Never let source confidence alone override candidate fit.
+
 ### Step 4: Deduplicate & Store
 
-1. Add ALL fetched jobs (new and skipped) to `seen_jobs.json` with structure:
+1. Add ALL fetched and consolidated jobs (new and skipped) to
+`seen_jobs.json`. The minimal backward-compatible example is:
 ```json
 {
   "seen": {
@@ -134,16 +269,25 @@ For each new job, do a rapid fit check (NOT the full evaluation from `04-job-eva
       "title": "...",
       "company": "...",
       "url": "...",
+      "canonical_url": "...",
+      "source_urls": ["..."],
       "first_seen": "YYYY-MM-DD",
       "fit": "high/medium/low",
       "status": "new/skipped/ranked/expired",
-      "portal": "<source portal skill, e.g. jobindex-search>"
+      "portal": "<source skill, legacy alias>",
+      "source": "<source skill>",
+      "source_confidence": "high/medium/low",
+      "evidence_status": "verified_detail/snippet_only/manual_review_required",
+      "date_status": "fresh/active_deadline/unknown/stale/expired/closed",
+      "search_priority": 0
     }
   }
 }
 ```
 
-The `portal` field records which CLI skill produced the job (results are already tagged per portal in Step 1b - persist that tag here). Entries written before this field existed lack it; the health check (Step 4.75) attributes those by matching the URL's domain against each portal's base URL, so do not backfill.
+The `source` field records the producing source skill; `portal` is its legacy
+alias. Entries written before these fields existed are tolerated. Do not
+backfill unverifiable evidence, dates, or China-specific fields.
 
 `/rank` extends this schema additively: ranked entries also carry `rank_score` (0–100 overall score), `rank_verdict` (fit band, e.g. "strong fit"), `rank_date` (ISO date of ranking), and `strengths`/`gaps` (1-3 verbatim bullets each, copied from the scoring agent's findings). The `status` field is set to `"ranked"`. Do not drop any of these fields when re-writing entries. Entries ranked before `strengths`/`gaps` existed simply lack them; readers tolerate their absence and never backfill by guessing.
 
@@ -177,7 +321,7 @@ specific person was found; these are search links, not results.
 
 Scraper-based portal CLIs rot silently: when a portal changes its markup, the parser usually exits 0 with zero results or with null/garbled fields, and the Step 1c fallback never fires because it only triggers on hard failure. This step catches that from evidence the run already holds.
 
-**Free pass (no extra requests).** For each enabled portal that ran in Step 1b:
+**Free pass (no extra requests).** For each enabled CLI source that ran in Step 1b:
 
 - **Degraded scan:** inspect the results it returned this run. Flags: `company` null or empty on every result, empty titles, undecoded entities (`&amp;`) or HTML fragments in titles, URLs that do not point at the portal. Any of these means the parser is half-working and `/scrape` is silently collecting junk.
 - **Yield history:** if the portal returned zero results across all of this run's queries, check whether `seen_jobs.json` holds prior entries from it (via the `portal` field, or by matching URL domains for entries predating the field). A portal that produced jobs on earlier runs and produces nothing now is suspect - the same queries worked before.
@@ -186,12 +330,20 @@ Scraper-based portal CLIs rot silently: when a portal changes its markup, the pa
 
 **Verdicts.** Healthy portals get silence - no table, no line. Anything else surfaces in the Step 5 summary as a health line.
 
-**Probe-only mode (`/scrape health`).** Skip Steps 1-4 and this step's free pass (there is no fresh run to scan); instead probe every installed portal directly - enabled ones by default, a disabled one only when named explicitly (e.g. `/scrape health jobnet`). Each portal gets the sentinel probe above, the degraded criteria applied to whatever it returns, and - since the user explicitly asked for diagnosis - one `detail` fetch on the first result of each healthy portal (description must be readable decoded text; a failure downgrades to degraded). Report all statuses in this mode, including healthy. Volume stays bounded: one search, at most one retry, at most one detail per portal.
+**Probe-only mode (`/scrape health`).** Skip Steps 1-4 and this step's free pass
+(there is no fresh run to scan). Probe enabled CLI sources by default; probe a
+disabled CLI source only when named. Each gets the bounded sentinel probe above.
+For `execution: web-search`, run one documented sentinel query and open at most
+one public detail result; report `healthy`, `degraded`, `blocked/manual`, or
+`inconclusive`. A manual source is reported `manual by design`, not broken.
+Volume stays bounded: one search, at most one retry, and at most one detail per
+source.
 
 ### Step 5: Present Results
 
-Present new jobs in a table sorted by fit (high first). When Step 1b skipped
-portals (`enabled: false`), report them with the `skipped (disabled):` line below
+Present new jobs sorted by `search_priority` (then deadline urgency and
+publication date). When Step 1 skipped sources (`enabled: false`), report them
+with the `skipped (disabled):` line below
 so opting one out stays visible rather than silent; omit the line when nothing
 was skipped. When Step 4.75 found a portal degraded, broken, or inconclusive,
 add one `health:` line per suspect portal (healthy portals get no line); after
@@ -210,17 +362,32 @@ skipped (disabled): <portal-name>, <portal-name>
 health: <portal-name> - degraded (company null on all 12 results); parsing anchors in .agents/skills/<portal-name>/url-reference.md
 health: <portal-name> - broken (0 results for the SKILL.md test query and a broader retry); parsing anchors in .agents/skills/<portal-name>/url-reference.md
 
-| # | Fit | Title | Company | Location | Deadline | URL |
-|---|-----|-------|---------|----------|----------|-----|
-| 1 | High | ... | ... | ... | ... | [Link](...) |
+| # | Priority | Fit | Title | Company | Location / work mode | Schedule / duration | Pay | Deadline / freshness | Confidence | URL |
+|---|----------|-----|-------|---------|----------------------|---------------------|-----|----------------------|------------|-----|
+| 1 | 86 | High | ... | ... | Shanghai / hybrid | 4-5 days / 3+ months | CNY 180-220/day | 2026-09-01 / fresh | High / verified detail | [Link](...) |
 
-If Step 2.5 flagged a mass-posting pattern, note it in the Title cell (e.g. "Frontend Developer (posted in 6 cities)") rather than burying it. Do the same for a declared-language-insufficient-level flag from the Language Gate (e.g. "Backend Engineer ⚠ fluent English required") - both are signals the user should see at a glance, not just in the detail highlights below.
+Use `unknown` visibly for missing schedule, salary, eligibility, or date fields.
+If Step 2.75 flagged a mass-posting pattern, note it in the Title cell (e.g.
+"Frontend Developer (posted in 6 cities)") rather than burying it. Do the same
+for a declared-language-insufficient-level flag from the Language Gate.
+
+After the table, add compact detail bullets for internship/campus records when
+available: arrival date; weekly attendance; duration; summer/winter/off-cycle;
+remote policy; education/year/cohort; conversion opportunity; role family;
+industry; company size; source publisher; and any conflicting source values.
+Do not hide a configured preference mismatch in those bullets.
 
 ### High-Match Highlights
 For each high-match job, add 2-3 bullet points:
 - Why it matches your profile
 - Key requirements to check
-- Any red flags (including mass-posting signals from Step 2.5)
+- Any red flags (including mass-posting signals from Step 2.75)
+
+### Manual-review leads
+List `snippet_only` and `manual_review_required` leads separately from verified
+matches. Give the search/result URL, what is known, what could not be verified,
+and the required user action (open while signed in, use the app/mini-program, or
+paste the JD). Never mix low-confidence snippets into the verified-match count.
 
 ### Contacts
 For each high/medium-fit job from Step 4.5, add a short contacts block with the two
@@ -244,12 +411,22 @@ If the user decides to apply to any job, the tracker row is written by **job-app
 
 ## Important Rules
 
-1. **Never fabricate job postings.** Only present jobs from actual CLI search/detail output or WebSearch/WebFetch results.
-2. **Respect deduplication.** Always check seen_jobs.json AND job_search_tracker.csv before presenting.
-3. **Focus on configured geographic area.** Skip jobs that require relocation or are clearly outside commute range.
+1. **Never fabricate job postings.** Only present jobs from actual CLI
+   search/detail output or WebSearch/WebFetch results. Search snippets are leads,
+   never verified details.
+2. **Respect cross-source deduplication.** Always consolidate aliases, retain
+   source provenance, and check seen_jobs.json AND job_search_tracker.csv.
+3. **Honor configured preferences.** Exclude only explicit deal-breaker
+   mismatches; flag unknown or soft schedule/location/eligibility mismatches.
 4. **Only open positions.** Skip postings with expired deadlines or those marked as closed.
 5. **Be efficient with detail fetches.** Don't run `detail` or WebFetch on every search hit — pre-filter by title/snippet, then fetch only promising matches.
-6. **Parallel searches.** Run portal CLI searches in parallel; use WebSearch only for gaps the CLIs don't cover.
+6. **Use each source by its declared execution mode.** Run CLI sources in
+   parallel, execute WebSearch source strategies directly, and keep manual
+   sources manual.
 7. **No automated people lookups.** Referral contacts (Step 4.5) are LinkedIn search links only - never fetch or scrape LinkedIn people-search result pages programmatically.
 8. **Health checks are bounded and honest.** Step 4.75 spends at most one probe, one retry, and (in `health` mode) one detail fetch per portal - a diagnosis, not a crawl. A rate-limit is never evidence of breakage. Health verdicts come only from observed CLI output; a portal that could not be tested is reported as inconclusive, never guessed. The `enabled` toggle is the only thing the health check may edit, and only with confirmation.
-9. **Flag distribution patterns, never accuse.** The mass-posting signal (Step 2.5) describes how a listing is being distributed, not a claim that the employer is a scam. Never name a company as fraudulent or untrustworthy - present the observation and let the user decide.
+9. **Flag distribution patterns, never accuse.** The mass-posting signal (Step
+   2.75) describes distribution, not a claim that an employer is fraudulent.
+10. **Confidence is evidence quality.** It never becomes an accusation or a
+    substitute for user judgment. Low-confidence and access-walled leads stay in
+    the manual-review section.
