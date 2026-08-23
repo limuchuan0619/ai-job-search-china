@@ -1,0 +1,143 @@
+# Broad mainland-China starter configuration.
+# Customize title keywords and companies after filling config/profile.yml.
+
+max_posting_age_days: 45
+
+# Provider scans stay broad, while explicit senior titles are discarded before
+# they reach the Lead review queue. Plain/ambiguous titles remain reviewable.
+skip_tiers:
+  - senior
+
+# This project is the mainland-China search preset. Provider results can include
+# the same employer's overseas requisitions, so keep only postings that expose a
+# China location. Missing locations still pass conservatively and are reviewed
+# during JD analysis.
+location_filter:
+  always_allow:
+    - "中国"
+    - "China"
+  allow:
+    - "中国"
+    - "China"
+
+title_filter:
+  positive:
+    - "实习"
+    - "校招"
+    - "应届"
+    - "管培生"
+    - "助理"
+    - "专员"
+    - "商务"
+    - "商业化"
+    - "市场"
+    - "品牌"
+    - "增长"
+    - "运营"
+    - "产品"
+    - "项目"
+    - "战略"
+    - "研究"
+    - "咨询"
+    - "数据"
+    - "算法"
+    - "软件"
+    - "AI"
+    - "intern"
+    - "graduate"
+    - "associate"
+    - "coordinator"
+  # Keep the default broad across functions and industries, but remove titles
+  # that explicitly advertise senior leadership/expert scope. Ambiguous titles
+  # such as 产品经理 remain eligible and are judged from the JD later.
+  negative:
+    - "高级"
+    - "资深"
+    - "专家"
+    - "负责人"
+    - "总监"
+    - "首席"
+    - "Leader"
+    - "Senior"
+    - "Staff"
+    - "Principal"
+    - "Director"
+    - "Head of"
+  seniority_boost:
+    - "应届"
+    - "校招"
+    - "管培生"
+
+# Full ATS-board sweeps can return tens of thousands of roles. Use a narrower
+# early-career lane there so the broad provider profile does not create noise.
+title_filter_full:
+  positive:
+    - "实习"
+    - "校招"
+    - "应届"
+    - "管培"
+    - "助理"
+    - "专员"
+    - "intern"
+    - "internship"
+    - "graduate"
+    - "trainee"
+    - "junior"
+    - "entry-level"
+    - "associate"
+    - "coordinator"
+  negative:
+    - "高级"
+    - "资深"
+    - "专家"
+    - "负责人"
+    - "总监"
+    - "首席"
+    - "Leader"
+    - "Senior"
+    - "Staff"
+    - "Principal"
+    - "Director"
+    - "Head of"
+  seniority_boost:
+    - "实习"
+    - "校招"
+    - "应届"
+    - "管培"
+
+search_queries:
+  - name: 国家大学生就业服务平台
+    query: 'site:ncss.cn (实习 OR 校招 OR 应届生 OR 管培生)'
+    enabled: true
+  - name: 中国公共招聘
+    query: 'site:job.mohrss.gov.cn (实习 OR 校招 OR 初级 OR 应届生)'
+    enabled: true
+  - name: 牛客公开职位
+    query: 'site:nowcoder.com/jobs (日常实习 OR 暑期实习 OR 校招)'
+    enabled: true
+  - name: 实习僧公开职位
+    query: 'site:shixiseng.com (实习 OR 暑期实习)'
+    enabled: true
+  - name: 企业官方招聘发现
+    query: '(招聘 OR 校招 OR 实习) (career OR careers OR jobs) 中国'
+    enabled: true
+
+tracked_companies:
+  - name: 腾讯
+    careers_url: https://careers.tencent.com/search.html
+    provider: tencent
+    keywords: ["实习", "校招", "商务", "市场", "运营", "产品", "数据", "AI"]
+    max_pages: 5
+    enabled: true
+  - name: 美团
+    careers_url: https://zhaopin.meituan.com/web/campus
+    provider: meituan
+    keywords: ["实习", "校招", "商务", "市场", "运营", "产品", "数据", "AI"]
+    max_pages: 5
+    enabled: true
+  - name: 阿里巴巴
+    careers_url: https://talent.alibaba.com/campus/position-list
+    provider: alibaba
+    keywords: ["实习", "校招", "商务", "市场", "运营", "产品", "数据", "AI"]
+    max_pages: 5
+    enabled: true

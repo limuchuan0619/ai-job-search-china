@@ -1,0 +1,8 @@
+# Local integration files that career-ops upstream does not own.
+integration/
+Start-AI-Career-Agent.cmd
+Start-AI-Career-Agent.ps1
+config/local-gitignore
+.playwright-browsers/
+.npm-cache/
+package-lock.json
