@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/limuchuan0619/ai-job-search-china/compare/web-v0.7.1...web-v0.8.0) (2026-08-23)
+
+
+### Features
+
+* integrate AI job search with career operations ([d9f5f65](https://github.com/limuchuan0619/ai-job-search-china/commit/d9f5f65ecf0f7c1a59196f47ced49b8992d45c3f))
+
 ## [0.7.1](https://github.com/santifer/career-ops/compare/web-v0.7.0...web-v0.7.1) (2026-08-20)
 
 
